@@ -176,6 +176,7 @@ const engine = new Engine(GODOT_CONFIG);
 			} catch (err) {
 				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
 			}
+			// There's a chance that installing the service worker would fix the issue
 			Promise.race([
 				serviceWorkerRegistrationPromise.then((registration) => {
 					if (registration != null) {
@@ -183,15 +184,18 @@ const engine = new Engine(GODOT_CONFIG);
 					}
 					return registration;
 				}).then(() => engine.installServiceWorker()),
+				// For some reason, `getRegistration()` can stall
 				new Promise((resolve) => {
 					setTimeout(() => resolve(), 2000);
 				}),
 			]).then(() => {
+				// Reload if there was no error.
 				window.location.reload();
 			}).catch((err) => {
 				console.error('Error while registering service worker:', err);
 			});
 		} else {
+			// Display the message as usual
 			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
@@ -212,89 +216,6 @@ const engine = new Engine(GODOT_CONFIG);
 		}, displayFailureNotice);
 	}
 }());
-
-// iPhone keyboard fix for Godot web builds
-(function () {
-	const canvas = document.getElementById('canvas');
-	if (!canvas) return;
-	canvas.setAttribute('tabindex', '0');
-
-	const helper = document.createElement('input');
-	helper.type = 'text';
-	helper.autocomplete = 'off';
-	helper.autocorrect = 'off';
-	helper.autocapitalize = 'none';
-	helper.spellcheck = false;
-	helper.inputMode = 'text';
-	helper.placeholder = 'Tên';
-	helper.setAttribute('aria-label', 'keyboard helper');
-	Object.assign(helper.style, {
-		position: 'fixed',
-		left: '50%',
-		bottom: '12px',
-		transform: 'translateX(-50%)',
-		width: '220px',
-		maxWidth: 'calc(100vw - 36px)',
-		height: '36px',
-		padding: '0 12px',
-		fontSize: '16px',
-		borderRadius: '10px',
-		border: '1px solid rgba(255,255,255,0.2)',
-		background: 'rgba(255,255,255,0.12)',
-		color: '#fff',
-		zIndex: '2147483647',
-		opacity: '0.02',
-		pointerEvents: 'auto',
-		outline: 'none'
-	});
-	document.body.appendChild(helper);
-
-	let refocusTimer = null;
-	function focusKeyboard() {
-		if (document.visibilityState !== 'visible') return;
-		try {
-			helper.focus();
-			helper.setSelectionRange(helper.value.length, helper.value.length);
-		} catch (e) {}
-	}
-
-	function requestRefocus() {
-		if (refocusTimer) clearTimeout(refocusTimer);
-		refocusTimer = setTimeout(function () {
-			focusKeyboard();
-		}, 180);
-	}
-
-	canvas.addEventListener('touchstart', function (e) {
-		if (e.target === helper) return;
-		requestRefocus();
-	}, { passive: false });
-	canvas.addEventListener('touchend', function (e) {
-		if (e.target === helper) return;
-		requestRefocus();
-	}, { passive: false });
-	canvas.addEventListener('click', function () {
-		requestRefocus();
-	}, { passive: true });
-	canvas.addEventListener('pointerdown', function () {
-		requestRefocus();
-	}, { passive: true });
-	document.addEventListener('touchstart', function (e) {
-		if (e.target === helper) return;
-		if (e.target === canvas || canvas.contains(e.target)) {
-			requestRefocus();
-		}
-	}, { passive: false });
-	helper.addEventListener('blur', function () {
-		requestRefocus();
-	});
-
-	setInterval(function () {
-		if (document.activeElement !== helper && document.visibilityState === 'visible') {
-			requestRefocus();
-		}
-	}, 1500);
-})();
 		</script>
 	</body>
 </html>
