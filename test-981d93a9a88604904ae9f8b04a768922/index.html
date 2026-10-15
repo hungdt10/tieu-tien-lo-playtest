@@ -213,78 +213,87 @@ const engine = new Engine(GODOT_CONFIG);
 	}
 }());
 
-// Mobile keyboard helper for iOS/Android
+// iPhone keyboard fix for Godot web builds
 (function () {
 	const canvas = document.getElementById('canvas');
 	if (!canvas) return;
-
 	canvas.setAttribute('tabindex', '0');
-	const mobileInput = document.createElement('input');
-	mobileInput.type = 'text';
-	mobileInput.autocomplete = 'off';
-	mobileInput.autocorrect = 'off';
-	mobileInput.autocapitalize = 'none';
-	mobileInput.spellcheck = false;
-	mobileInput.inputMode = 'text';
-	mobileInput.setAttribute('aria-label', 'game keyboard helper');
-	// Place a tiny, nearly invisible but interactive input near the bottom center so mobile browsers allow focus.
-	Object.assign(mobileInput.style, {
+
+	const helper = document.createElement('input');
+	helper.type = 'text';
+	helper.autocomplete = 'off';
+	helper.autocorrect = 'off';
+	helper.autocapitalize = 'none';
+	helper.spellcheck = false;
+	helper.inputMode = 'text';
+	helper.placeholder = 'Tên';
+	helper.setAttribute('aria-label', 'keyboard helper');
+	Object.assign(helper.style, {
 		position: 'fixed',
 		left: '50%',
+		bottom: '12px',
 		transform: 'translateX(-50%)',
-		bottom: '8px',
-		width: '2px',
-		height: '2px',
-		opacity: '0.01',
-		background: 'transparent',
-		border: 'none',
-		padding: '0',
-		margin: '0',
+		width: '220px',
+		maxWidth: 'calc(100vw - 36px)',
+		height: '36px',
+		padding: '0 12px',
+		fontSize: '16px',
+		borderRadius: '10px',
+		border: '1px solid rgba(255,255,255,0.2)',
+		background: 'rgba(255,255,255,0.12)',
+		color: '#fff',
 		zIndex: '2147483647',
-		pointerEvents: 'auto'
+		opacity: '0.02',
+		pointerEvents: 'auto',
+		outline: 'none'
 	});
-	document.body.appendChild(mobileInput);
+	document.body.appendChild(helper);
 
-	let lastTap = 0;
-	function focusSoftKeyboard(e) {
-		// ensure this is a user gesture; if called inside passive handler it may be blocked on some browsers
+	let refocusTimer = null;
+	function focusKeyboard() {
+		if (document.visibilityState !== 'visible') return;
 		try {
-			mobileInput.focus();
-			mobileInput.setSelectionRange(mobileInput.value.length, mobileInput.value.length);
-		} catch (err) {
-			// ignore
-		}
+			helper.focus();
+			helper.setSelectionRange(helper.value.length, helper.value.length);
+		} catch (e) {}
 	}
 
-	// Use non-passive listeners for touchstart/touchend so focus is allowed on iOS
-	canvas.addEventListener('touchstart', function (e) { focusSoftKeyboard(e); }, { passive: false });
-	canvas.addEventListener('touchend', function (e) { focusSoftKeyboard(e); }, { passive: false });
-	canvas.addEventListener('click', function (e) { focusSoftKeyboard(e); }, { passive: true });
-	canvas.addEventListener('pointerdown', function (e) { focusSoftKeyboard(e); }, { passive: true });
+	function requestRefocus() {
+		if (refocusTimer) clearTimeout(refocusTimer);
+		refocusTimer = setTimeout(function () {
+			focusKeyboard();
+		}, 180);
+	}
 
-	// If user taps anywhere else inside the page (not only canvas), reopen keyboard as well
-	document.addEventListener('touchstart', function (e) {
-		// ignore touches directly on the input itself
-		if (e.target === mobileInput) return;
-		focusSoftKeyboard(e);
+	canvas.addEventListener('touchstart', function (e) {
+		if (e.target === helper) return;
+		requestRefocus();
 	}, { passive: false });
-
-	// If input loses focus (user dismissed the keyboard), keep it ready for next tap
-	mobileInput.addEventListener('blur', function () {
-		// small timeout to avoid immediate re-open when user intentionally closed keyboard
-		setTimeout(function(){
-			// clear value if needed
-			// mobileInput.value = '';
-		}, 100);
+	canvas.addEventListener('touchend', function (e) {
+		if (e.target === helper) return;
+		requestRefocus();
+	}, { passive: false });
+	canvas.addEventListener('click', function () {
+		requestRefocus();
+	}, { passive: true });
+	canvas.addEventListener('pointerdown', function () {
+		requestRefocus();
+	}, { passive: true });
+	document.addEventListener('touchstart', function (e) {
+		if (e.target === helper) return;
+		if (e.target === canvas || canvas.contains(e.target)) {
+			requestRefocus();
+		}
+	}, { passive: false });
+	helper.addEventListener('blur', function () {
+		requestRefocus();
 	});
 
-	// Optional: forward input events to the game if needed (e.g., to send typed characters to Godot)
-	// mobileInput.addEventListener('input', function (e) {
-	//     const val = mobileInput.value;
-	//     // send to game via Engine API if available
-	//     // Engine.sendTextInput && Engine.sendTextInput(val);
-	// });
-
+	setInterval(function () {
+		if (document.activeElement !== helper && document.visibilityState === 'visible') {
+			requestRefocus();
+		}
+	}, 1500);
 })();
 		</script>
 	</body>
