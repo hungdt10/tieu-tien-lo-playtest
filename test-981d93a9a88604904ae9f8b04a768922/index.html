@@ -113,7 +113,7 @@ body {
 
 		<script src="index.js"></script>
 		<script>
-const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":64005400,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+const GODOT_CONFIG = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":6400540,"index.wasm":39514754},"focusCanvas":true,"godotVersion":"4.2.2","serviceWorker":{"scope":"./","code":"service-worker.js"},"shader_compiler":true,"universe":false};
 const GODOT_THREADS_ENABLED = false;
 const engine = new Engine(GODOT_CONFIG);
 
@@ -176,7 +176,6 @@ const engine = new Engine(GODOT_CONFIG);
 			} catch (err) {
 				serviceWorkerRegistrationPromise = Promise.reject(new Error('Service worker registration failed.'));
 			}
-			// There's a chance that installing the service worker would fix the issue
 			Promise.race([
 				serviceWorkerRegistrationPromise.then((registration) => {
 					if (registration != null) {
@@ -184,18 +183,15 @@ const engine = new Engine(GODOT_CONFIG);
 					}
 					return registration;
 				}).then(() => engine.installServiceWorker()),
-				// For some reason, `getRegistration()` can stall
 				new Promise((resolve) => {
 					setTimeout(() => resolve(), 2000);
 				}),
 			]).then(() => {
-				// Reload if there was no error.
 				window.location.reload();
 			}).catch((err) => {
 				console.error('Error while registering service worker:', err);
 			});
 		} else {
-			// Display the message as usual
 			const missingMsg = 'Error\nThe following features required to run Godot projects on the Web are missing:\n';
 			displayFailureNotice(missingMsg + missing.join('\n'));
 		}
@@ -216,7 +212,51 @@ const engine = new Engine(GODOT_CONFIG);
 		}, displayFailureNotice);
 	}
 }());
+
+(function () {
+	const canvas = document.getElementById('canvas');
+	if (!canvas) return;
+
+	canvas.setAttribute('tabindex', '0');
+	const mobileInput = document.createElement('input');
+	mobileInput.type = 'text';
+	mobileInput.autocomplete = 'off';
+	mobileInput.autocorrect = 'off';
+	mobileInput.autocapitalize = 'none';
+	mobileInput.spellcheck = false;
+	mobileInput.inputMode = 'text';
+	mobileInput.setAttribute('aria-label', 'game keyboard helper');
+	Object.assign(mobileInput.style, {
+		position: 'fixed',
+		left: '-1000px',
+		top: '-1000px',
+		width: '1px',
+		height: '1px',
+		opacity: '0',
+		border: 'none',
+		padding: '0',
+		margin: '0',
+		zIndex: '2147483647',
+		pointerEvents: 'none'
+	});
+	document.body.appendChild(mobileInput);
+
+	function focusSoftKeyboard() {
+		if (document.activeElement !== mobileInput) {
+			try {
+				mobileInput.focus();
+				mobileInput.setSelectionRange(0, mobileInput.value.length);
+			} catch (e) {}
+		}
+	}
+
+	canvas.addEventListener('touchstart', function () {
+		setTimeout(focusSoftKeyboard, 50);
+	}, { passive: true });
+	canvas.addEventListener('touchend', focusSoftKeyboard, { passive: true });
+	canvas.addEventListener('click', focusSoftKeyboard, { passive: true });
+	canvas.addEventListener('pointerdown', focusSoftKeyboard, { passive: true });
+})();
 		</script>
 	</body>
 </html>
-
