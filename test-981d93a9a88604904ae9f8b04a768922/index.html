@@ -213,6 +213,7 @@ const engine = new Engine(GODOT_CONFIG);
 	}
 }());
 
+// Mobile keyboard helper for iOS/Android
 (function () {
 	const canvas = document.getElementById('canvas');
 	if (!canvas) return;
@@ -226,36 +227,64 @@ const engine = new Engine(GODOT_CONFIG);
 	mobileInput.spellcheck = false;
 	mobileInput.inputMode = 'text';
 	mobileInput.setAttribute('aria-label', 'game keyboard helper');
+	// Place a tiny, nearly invisible but interactive input near the bottom center so mobile browsers allow focus.
 	Object.assign(mobileInput.style, {
 		position: 'fixed',
-		left: '-1000px',
-		top: '-1000px',
-		width: '1px',
-		height: '1px',
-		opacity: '0',
+		left: '50%',
+		transform: 'translateX(-50%)',
+		bottom: '8px',
+		width: '2px',
+		height: '2px',
+		opacity: '0.01',
+		background: 'transparent',
 		border: 'none',
 		padding: '0',
 		margin: '0',
 		zIndex: '2147483647',
-		pointerEvents: 'none'
+		pointerEvents: 'auto'
 	});
 	document.body.appendChild(mobileInput);
 
-	function focusSoftKeyboard() {
-		if (document.activeElement !== mobileInput) {
-			try {
-				mobileInput.focus();
-				mobileInput.setSelectionRange(0, mobileInput.value.length);
-			} catch (e) {}
+	let lastTap = 0;
+	function focusSoftKeyboard(e) {
+		// ensure this is a user gesture; if called inside passive handler it may be blocked on some browsers
+		try {
+			mobileInput.focus();
+			mobileInput.setSelectionRange(mobileInput.value.length, mobileInput.value.length);
+		} catch (err) {
+			// ignore
 		}
 	}
 
-	canvas.addEventListener('touchstart', function () {
-		setTimeout(focusSoftKeyboard, 50);
-	}, { passive: true });
-	canvas.addEventListener('touchend', focusSoftKeyboard, { passive: true });
-	canvas.addEventListener('click', focusSoftKeyboard, { passive: true });
-	canvas.addEventListener('pointerdown', focusSoftKeyboard, { passive: true });
+	// Use non-passive listeners for touchstart/touchend so focus is allowed on iOS
+	canvas.addEventListener('touchstart', function (e) { focusSoftKeyboard(e); }, { passive: false });
+	canvas.addEventListener('touchend', function (e) { focusSoftKeyboard(e); }, { passive: false });
+	canvas.addEventListener('click', function (e) { focusSoftKeyboard(e); }, { passive: true });
+	canvas.addEventListener('pointerdown', function (e) { focusSoftKeyboard(e); }, { passive: true });
+
+	// If user taps anywhere else inside the page (not only canvas), reopen keyboard as well
+	document.addEventListener('touchstart', function (e) {
+		// ignore touches directly on the input itself
+		if (e.target === mobileInput) return;
+		focusSoftKeyboard(e);
+	}, { passive: false });
+
+	// If input loses focus (user dismissed the keyboard), keep it ready for next tap
+	mobileInput.addEventListener('blur', function () {
+		// small timeout to avoid immediate re-open when user intentionally closed keyboard
+		setTimeout(function(){
+			// clear value if needed
+			// mobileInput.value = '';
+		}, 100);
+	});
+
+	// Optional: forward input events to the game if needed (e.g., to send typed characters to Godot)
+	// mobileInput.addEventListener('input', function (e) {
+	//     const val = mobileInput.value;
+	//     // send to game via Engine API if available
+	//     // Engine.sendTextInput && Engine.sendTextInput(val);
+	// });
+
 })();
 		</script>
 	</body>
